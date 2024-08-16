@@ -74,13 +74,11 @@ def create_user():
 @app.route('/generate-qr', methods=['GET'])
 def generate_qr():
 
-    bogota = pytz.timezone('America/Bogota')
-    timestamp = datetime.now(bogota).strftime('%Y-%m-%d %H:%M:%S')
-
+ 
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    query = "SELECT username FROM user ORDER BY id DESC LIMIT 1"
+    query = "SELECT id FROM user ORDER BY id DESC LIMIT 1"
     cursor.execute(query)
     result = cursor.fetchone()
     cursor.close()
@@ -89,10 +87,10 @@ def generate_qr():
     if result is None:
         return jsonify({'error':'No users found'}), 400
 
-    user_name = result[0]
- 
+    user_id = result[0]
+    product_id = result[0]
 
-    qr_data = f"http://localhost:5009/scan_qr?user_name={user_name}"
+    qr_data = f"http://localhost:5009/scan_qr?user_id={user_id}&product_id={product_id}"
     qr = qrcode.QRCode(
          version = 1,
          error_correction = qrcode.constants.ERROR_CORRECT_L,
@@ -116,29 +114,47 @@ def generate_qr():
 @app.route('/scan_qr', methods=['GET'])
 def scan_qr():
     
-    user_name = request.args.get('user_name')
+    user_id = int(request.args.get('user_id'))
+
+    product_id = request.args.get('product_id')
   
 
-    if user_name is None:
+    if user_id is None:
+        return jsonify({'error': 'User name is required'}),400
+    
+    if product_id is None:
         return jsonify({'error': 'User name is required'}),400
     
 
-    bogota = pytz.timezone('America/Bogota')
-    timestamp = datetime.now(bogota).strftime('%Y-%m-%d %H:%M:%S')
     connection = get_db_connection()
     cursor = connection.cursor()
 
     try:
-        cursor.execute('SELECT id FROM user WHERE username = %s', (user_name,))
+        cursor.execute('SELECT id FROM user WHERE id = %s', (user_id,))
         result = cursor.fetchone()
 
         if result is None:
             return jsonify({'error': 'No user found'}), 400
 
         user_id = result[0]
+
+        cursor.execute('SELECT id FROM product WHERE id = %s', (product_id,))
+        result = cursor.fetchone()
+
+        if result is None:
+            return jsonify({'error': 'No user found'}), 400
+
+        product_id = result[0]
+
+        #query2 = 'SELECT id FROM product WHERE id = %s', (product_id)
+
+        #cursor.execute(query2, (product_id))
+        #result2 = cursor.fetchone()
+        
+        #product_id = result2
        
-        query = "INSERT INTO carrito (user_id,timestamp) VALUES (%s , %s)"
-        cursor.execute(query,(user_id,timestamp))
+        query = "INSERT INTO carrito (user_id,product_id) VALUES (%s , %s)"
+        cursor.execute(query,(user_id,product_id))
         connection.commit()
 
         response = {'message': 'Scan registered successfully'}
